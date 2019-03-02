@@ -1,0 +1,10 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"script",
+	"author":	"Yuval Rakavy",
+	"description":	{
+		"":	"Batch post all tool path according to Setup/Folder structure (each setup in its own directory) and ecch folder as its own .NC file."
+	},
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
