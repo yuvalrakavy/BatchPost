@@ -25,7 +25,7 @@ def getCamObject():
         return adsk.cam.CAM.cast(product)
             
     
-class BatchPostInput:
+class BatchPostSettings:
     def __init__(self, cam, progressDialog, outputDirectory, postProcessorFile, drillsCounter):
         self.__cam = cam
         self.__progressDialog = progressDialog
@@ -218,7 +218,6 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
                 selectOutputFolderDialog = ui.createFolderDialog()
                 selectOutputFolderDialog.title = 'Select root folder for product NC files'
                 
-                #TODO: set initial directory based on an attached attribute for the active document
                 if selectOutputFolderDialog.showDialog() == adsk.core.DialogResults.DialogOK:
                     outputDirectory = selectOutputFolderDialog.folder
                 else:
@@ -232,12 +231,12 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
             progressDialog = ui.createProgressDialog()
             progressDialog.show('Generate Toolpath files', 'Starting...', 0, progressSteps)
             
-            batchPostInput = BatchPostInput(cam, progressDialog, outputDirectory, postProcessorFile, DrillsCounter() if countDrills.value else None)
+            batchPostSettings = BatchPostSettings(cam, progressDialog, outputDirectory, postProcessorFile, DrillsCounter() if countDrills.value else None)
             
             if postThisSpecificSetup is None:
-                self.postAll(batchPostInput)
+                self.postAll(batchPostSettings)
             else:
-                self.postSetup(batchPostInput, postThisSpecificSetup)
+                self.postSetup(batchPostSettings, postThisSpecificSetup)
                 
             progressDialog.hide()
 
@@ -246,26 +245,26 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
             if ui:
                 ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
 
-    def postAll(self, batchPostInput):
-        for setup in batchPostInput.cam.setups:
-            self.postSetup(batchPostInput, setup)
+    def postAll(self, batchPostSettings):
+        for setup in batchPostSettings.cam.setups:
+            self.postSetup(batchPostSettings, setup)
     
-    def postSetup(self, batchPostInput, setup):
+    def postSetup(self, batchPostSettings, setup):
         assert type(setup) is adsk.cam.Setup
         
         # pass on all the folder in the setup
         for folderIndex in range(setup.folders.count):
-            self.postSetupFolder(batchPostInput, setup, setup.folders.item(folderIndex), folderIndex)
+            self.postSetupFolder(batchPostSettings, setup, setup.folders.item(folderIndex), folderIndex)
             
-            if batchPostInput.progressDialog.wasCancelled:
+            if batchPostSettings.progressDialog.wasCancelled:
                 return
     
-    def postSetupFolder(self, batchPostInput, setup, folder, folderIndex):
+    def postSetupFolder(self, batchPostSettings, setup, folder, folderIndex):
         assert type(setup) is adsk.cam.Setup
         assert type(folder) is adsk.cam.CAMFolder
     
         folderName = re.sub(' \(\d+\)', '', folder.name)
-        ncDirectory = os.path.join(batchPostInput.outputDirectory, setup.name)
+        ncDirectory = os.path.join(batchPostSettings.outputDirectory, setup.name)
         ncProgramName = str(folderIndex) + "_" + folderName
         ncFilename = os.path.join(ncDirectory, ncProgramName + ".nc")
         
@@ -273,20 +272,20 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
         
         needRegeneration = [operation for operation in folder.allOperations if not operation.hasToolpath or not operation.isToolpathValid]
         for operation in needRegeneration:
-            batchPostInput.progressDialog.message = "Generating toolpath for '%s' %s: %s" % (setup.name, folderName, operation.name)
-            generationFuture = batchPostInput.cam.generateToolpath(operation)
+            batchPostSettings.progressDialog.message = "Generating toolpath for '%s' %s: %s" % (setup.name, folderName, operation.name)
+            generationFuture = batchPostSettings.cam.generateToolpath(operation)
             
             while not generationFuture.isGenerationCompleted:
                 adsk.doEvents()
         
-            if batchPostInput.progressDialog.wasCancelled:
+            if batchPostSettings.progressDialog.wasCancelled:
                 return
             
-        batchPostInput.progressDialog.message = "Posting toolpath for '%s' %s" % (setup.name, folderName)
-        postInput = adsk.cam.PostProcessInput.create(ncProgramName, batchPostInput.postProcessorFile, ncDirectory, adsk.cam.PostOutputUnitOptions.DocumentUnitsOutput)
+        batchPostSettings.progressDialog.message = "Posting toolpath for '%s' %s" % (setup.name, folderName)
+        postInput = adsk.cam.PostProcessInput.create(ncProgramName, batchPostSettings.postProcessorFile, ncDirectory, adsk.cam.PostOutputUnitOptions.DocumentUnitsOutput)
         postInput.isOpenInEditor = False
         
-        if not batchPostInput.cam.postProcess(folder.allOperations, postInput):
+        if not batchPostSettings.cam.postProcess(folder.allOperations, postInput):
             ui.messageBox("Post operation for setup '%s' - %s failed" % (setup.name, folder.name), 'Post operation failed', adsk.core.MessageBoxButtonTypes.OKButtonType, adsk.core.MessageBoxIconTypes.CriticalIconType)
         
         # This delay is needed to ensure that the post is done (otherwise there is a race condition and some post are failing)
@@ -294,10 +293,10 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
         while time.time() - startTime < 0.5:
             adsk.doEvents()
         
-        if batchPostInput.drillsCounter is not None and "drill" in folderName.lower():
-            batchPostInput.drillsCounter.process(ncFilename)
+        if batchPostSettings.drillsCounter is not None and "drill" in folderName.lower():
+            batchPostSettings.drillsCounter.process(ncFilename)
             
-        batchPostInput.progressDialog.progressValue += 1
+        batchPostSettings.progressDialog.progressValue += 1
 
 
 def run(context):
