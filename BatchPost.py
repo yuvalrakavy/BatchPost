@@ -202,6 +202,7 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
                 fileDialog.filter = 'Post processor files (*.cps);;All files (*.*)'
                 fileDialog.isMultiSelectEnabled = False
                 fileDialog.title = 'Select Post Processor to use'
+                fileDialog.initialDirectory = cam.personalPostFolder
                 
                 if fileDialog.showOpen() == adsk.core.DialogResults.DialogOK:
                     postProcessorFile = fileDialog.filename
