@@ -10,6 +10,10 @@ if app:
     ui = app.userInterface
 handlers = []       # Used to avoid garabge collection of handler classes
 
+class Struct:
+    def __init__(self, **v):
+        self.__dict__.update(v)
+
 def getCamObject():
     doc = app.activeDocument
     products = doc.products
@@ -23,36 +27,7 @@ def getCamObject():
         return None
     else:
         return adsk.cam.CAM.cast(product)
-            
-    
-class BatchPostSettings:
-    def __init__(self, cam, progressDialog, outputDirectory, postProcessorFile, drillsCounter):
-        self.__cam = cam
-        self.__progressDialog = progressDialog
-        self.__outputDirectory = outputDirectory
-        self.__postProcessorFile = postProcessorFile
-        self.__drillsCounter = drillsCounter
-        
-    @property
-    def cam(self):
-        return self.__cam
-        
-    @property
-    def outputDirectory(self):
-        return self.__outputDirectory
-        
-    @property
-    def postProcessorFile(self):
-        return self.__postProcessorFile
-        
-    @property
-    def drillsCounter(self):
-        return self.__drillsCounter
-        
-    @property
-    def progressDialog(self):
-        return self.__progressDialog
-        
+
 
 class BatchPostCommandCreatedHandler(adsk.core.CommandCreatedEventHandler):
     def __init__(self):
@@ -232,7 +207,13 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
             progressDialog = ui.createProgressDialog()
             progressDialog.show('Generate Toolpath files', 'Starting...', 0, progressSteps)
             
-            batchPostSettings = BatchPostSettings(cam, progressDialog, outputDirectory, postProcessorFile, DrillsCounter() if countDrills.value else None)
+            batchPostSettings = Struct(
+                cam = cam,
+                progressDialog = progressDialog,
+                outputDirectory = outputDirectory,
+                postProcessorFile = postProcessorFile,
+                drillsCounter = DrillsCounter() if countDrills.value else None
+            )
             
             if postThisSpecificSetup is None:
                 self.postAll(batchPostSettings)
@@ -264,7 +245,7 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
         assert type(setup) is adsk.cam.Setup
         assert type(folder) is adsk.cam.CAMFolder
     
-        folderName = re.sub(' \(\d+\)', '', folder.name)
+        folderName = re.sub(r' \(\d+\)', '', folder.name)
         ncDirectory = os.path.join(batchPostSettings.outputDirectory, setup.name)
         ncProgramName = str(folderIndex) + "_" + folderName
         ncFilename = os.path.join(ncDirectory, ncProgramName + ".nc")
@@ -277,7 +258,7 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
             generationFuture = batchPostSettings.cam.generateToolpath(operation)
             
             while not generationFuture.isGenerationCompleted:
-                adsk.doEvents()
+                adsk.core.adsk_doEvents()
         
             if batchPostSettings.progressDialog.wasCancelled:
                 return
@@ -292,7 +273,7 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
         # This delay is needed to ensure that the post is done (otherwise there is a race condition and some post are failing)
         startTime = time.time()
         while time.time() - startTime < 0.5:
-            adsk.doEvents()
+            adsk.core.adsk_doEvents()
         
         if batchPostSettings.drillsCounter is not None and "drill" in folderName.lower():
             batchPostSettings.drillsCounter.process(ncFilename)
