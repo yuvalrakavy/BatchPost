@@ -215,11 +215,7 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
                 drillsCounter = DrillsCounter() if countDrills.value else None
             )
             
-            if postThisSpecificSetup is None:
-                self.postAll(batchPostSettings)
-            else:
-                self.postSetup(batchPostSettings, postThisSpecificSetup)
-                
+            [self.postSetup(batchPostSettings, setup) for setup in cam.setups if postThisSpecificSetup is None or setup == postThisSpecificSetup]
             progressDialog.hide()
 
         except:
@@ -227,10 +223,6 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
             if ui:
                 ui.messageBox('Failed:\n{}'.format(traceback.format_exc()))
 
-    def postAll(self, batchPostSettings):
-        for setup in batchPostSettings.cam.setups:
-            self.postSetup(batchPostSettings, setup)
-    
     def postSetup(self, batchPostSettings, setup):
         assert type(setup) is adsk.cam.Setup
         
