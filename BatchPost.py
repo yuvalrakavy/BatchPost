@@ -135,6 +135,7 @@ class BatchPostCommandDestoryHandler(adsk.core.CommandEventHandler):
         try:
             # when the command is done, terminate the script
             # this will release all globals which will remove all event handlers
+            print("Terminating script")
             adsk.terminate()
         except:
             if ui:
@@ -244,7 +245,7 @@ class BatchPostCommandExecuteHandler(adsk.core.CommandEventHandler):
         
         os.makedirs(ncDirectory, exist_ok=True)
         
-        needRegeneration = [operation for operation in folder.allOperations if not operation.hasToolpath or not operation.isToolpathValid]
+        needRegeneration = [operation for operation in folder.allOperations if (not operation.hasToolpath or not operation.isToolpathValid) and not operation.isSuppressed]
         for operation in needRegeneration:
             batchPostSettings.progressDialog.message = "Generating toolpath for '%s' %s: %s" % (setup.name, folderName, operation.name)
             generationFuture = batchPostSettings.cam.generateToolpath(operation)
